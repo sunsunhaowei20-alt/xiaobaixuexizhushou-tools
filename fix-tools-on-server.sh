@@ -3,19 +3,16 @@ set -euo pipefail
 
 BUNDLE=/opt/xiaobai-tools
 DOMAIN=xiaobaixuexizhushou.cn
-SITE=/www/wwwroot/$DOMAIN
 LOG=/tmp/fix_tools.log
 
 exec > >(tee -a "$LOG") 2>&1
 echo "[$(date)] fix tools start"
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Java 21 for superllm (standalone JDK, avoids package conflicts with Java 17)
 JDK21=/opt/jdk-21
 if [ ! -x "$JDK21/bin/java" ]; then
   echo "installing Temurin JDK 21 to $JDK21 ..."
   mkdir -p /opt
-  rm -rf /tmp/jdk21.tgz /opt/jdk-21.tmp
   curl -fsSL "https://ghfast.top/https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4%2B7/OpenJDK21U-jdk_x64_linux_hotspot_21.0.4_7.tar.gz" -o /tmp/jdk21.tgz
   tar -xzf /tmp/jdk21.tgz -C /opt
   rm -rf "$JDK21"
@@ -23,7 +20,6 @@ if [ ! -x "$JDK21/bin/java" ]; then
 fi
 export JAVA_HOME="$JDK21"
 export PATH="$JAVA_HOME/bin:$PATH"
-java -version
 
 set -a
 source "$BUNDLE/services/runtime.env"
@@ -45,30 +41,7 @@ EOF
 PORT=${PORT_ZHAIYUE:-3000} HOSTNAME=127.0.0.1 NODE_ENV=production \
   pm2 start server.js --name zhaiyue --cwd "$BUNDLE/services/zhaiyue"
 sleep 2
-pm2 logs zhaiyue --lines 15 --nostream || true
-
-# superllm jar
-JAR="$BUNDLE/services/superllm/yu-ai-agent.jar"
-if [ ! -f "$JAR" ]; then
-  echo "building superllm jar with Java 21..."
-  if ! command -v mvn >/dev/null 2>&1; then
-    yum install -y maven 2>/dev/null || dnf install -y maven 2>/dev/null || true
-  fi
-  chmod +x "$BUNDLE/services/superllm-src/mvnw" 2>/dev/null || true
-  cd "$BUNDLE/services/superllm-src"
-  mvn -q -DskipTests package
-  JAR=$(find "$BUNDLE/services/superllm-src/target" -name '*.jar' ! -name '*original*' | head -n 1)
-  mkdir -p "$BUNDLE/services/superllm"
-  cp "$JAR" "$BUNDLE/services/superllm/yu-ai-agent.jar"
-fi
-
-pm2 delete superllm 2>/dev/null || true
-pm2 start "$JAVA_HOME/bin/java" --name superllm -- \
-  -jar "$BUNDLE/services/superllm/yu-ai-agent.jar" \
-  --server.port=${PORT_SUPERLLM:-8123} \
-  --spring.ai.openai.api-key="$AI_API_KEY" \
-  --spring.ai.openai.base-url="$AI_BASE_URL" \
-  --spring.ai.openai.chat.options.model="$AI_MODEL"
+pm2 logs zhaiyue --lines 10 --nostream || true
 
 # xiaobai api
 pm2 delete xiaobai-api 2>/dev/null || true
@@ -84,9 +57,7 @@ EOF
 pm2 start "python3 -m uvicorn main:app --host 127.0.0.1 --port ${PORT_XIAOBAI:-8765}" \
   --name xiaobai-api --cwd "$BUNDLE/services/xiaobai-server" --interpreter bash
 
-pm2 save
-
-# nginx
+# nginx first so static/API routes work even if superllm build is slow
 SNIP=/www/server/panel/vhost/nginx/extension/$DOMAIN
 mkdir -p "$SNIP"
 cat > "$SNIP/tools_proxy.conf" << 'NGINX'
@@ -136,8 +107,29 @@ NGINX
 
 /www/server/nginx/sbin/nginx -t
 /www/server/nginx/sbin/nginx -s reload
+echo "nginx reloaded"
 
-sleep 5
+# superllm jar via bundled mvnw + JDK21
+JAR="$BUNDLE/services/superllm/yu-ai-agent.jar"
+if [ ! -f "$JAR" ]; then
+  echo "building superllm jar with mvnw + JDK21..."
+  cd "$BUNDLE/services/superllm-src"
+  chmod +x mvnw
+  ./mvnw -q -DskipTests package
+  JAR=$(find "$BUNDLE/services/superllm-src/target" -name '*.jar' ! -name '*original*' | head -n 1)
+  mkdir -p "$BUNDLE/services/superllm"
+  cp "$JAR" "$BUNDLE/services/superllm/yu-ai-agent.jar"
+fi
+
+pm2 delete superllm 2>/dev/null || true
+pm2 start "$JAVA_HOME/bin/java" --name superllm -- \
+  -jar "$BUNDLE/services/superllm/yu-ai-agent.jar" \
+  --server.port=${PORT_SUPERLLM:-8123} \
+  --spring.ai.openai.api-key="$AI_API_KEY" \
+  --spring.ai.openai.base-url="$AI_BASE_URL" \
+  --spring.ai.openai.chat.options.model="$AI_MODEL"
+
+pm2 save
 pm2 list
 curl -sI -m 8 http://127.0.0.1:3000/api/summarize -X OPTIONS | head -n 3 || true
 echo "[$(date)] FIX_TOOLS_DONE"
