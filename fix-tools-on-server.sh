@@ -8,6 +8,7 @@ LOG=/tmp/fix_tools.log
 
 exec > >(tee -a "$LOG") 2>&1
 echo "[$(date)] fix tools start"
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Java 21 for superllm (standalone JDK, avoids package conflicts with Java 17)
 JDK21=/opt/jdk-21
@@ -32,6 +33,10 @@ export AI_API_KEY AI_BASE_URL AI_MODEL
 # zhaiyue
 pm2 delete zhaiyue 2>/dev/null || true
 cd "$BUNDLE/services/zhaiyue"
+if [ ! -d node_modules/next ]; then
+  echo "installing zhaiyue node_modules..."
+  npm install --omit=dev --no-audit --no-fund
+fi
 cat > .env.local << EOF
 AI_API_KEY=$AI_API_KEY
 AI_BASE_URL=$AI_BASE_URL
@@ -46,6 +51,9 @@ pm2 logs zhaiyue --lines 15 --nostream || true
 JAR="$BUNDLE/services/superllm/yu-ai-agent.jar"
 if [ ! -f "$JAR" ]; then
   echo "building superllm jar with Java 21..."
+  if ! command -v mvn >/dev/null 2>&1; then
+    yum install -y maven 2>/dev/null || dnf install -y maven 2>/dev/null || true
+  fi
   chmod +x "$BUNDLE/services/superllm-src/mvnw" 2>/dev/null || true
   cd "$BUNDLE/services/superllm-src"
   mvn -q -DskipTests package
