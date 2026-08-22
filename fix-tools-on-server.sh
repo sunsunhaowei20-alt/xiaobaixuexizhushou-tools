@@ -9,10 +9,12 @@ LOG=/tmp/fix_tools.log
 exec > >(tee -a "$LOG") 2>&1
 echo "[$(date)] fix tools start"
 
-# Java 21 for superllm
+# Java 21 for superllm (replace Java 17 if present)
 if ! java -version 2>&1 | grep -q 'version "21'; then
-  yum install -y java-21-konajdk java-21-konajdk-devel 2>/dev/null \
-    || dnf install -y java-21-konajdk java-21-konajdk-devel 2>/dev/null \
+  yum remove -y java-17-konajdk-headless java-17-konajdk-devel 2>/dev/null || true
+  dnf remove -y java-17-konajdk-headless java-17-konajdk-devel 2>/dev/null || true
+  yum install -y java-21-konajdk-headless java-21-konajdk-devel 2>/dev/null \
+    || dnf install -y java-21-konajdk-headless java-21-konajdk-devel 2>/dev/null \
     || yum install -y java-21-openjdk-headless 2>/dev/null \
     || dnf install -y java-21-openjdk-headless
 fi
