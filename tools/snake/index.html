@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>贪吃蛇 · tanchishe</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <a class="back-showcase" id="back-showcase" href="../../index.html">返回展示台</a>
+  <main class="app">
+    <header class="header">
+      <h1>tanchishe</h1>
+      <p class="hint">方向键 / WASD / 下方触控键 · 长按加速 · 空格暂停 · Enter 重开<br />红方块 +1 · 蓝方块 +2</p>
+    </header>
+
+    <section class="panel">
+      <div class="stat">得分 <span id="score">0</span></div>
+      <div class="stat">长度 <span id="length">3</span></div>
+      <button id="btn-start" type="button">开始</button>
+    </section>
+
+    <canvas id="board" width="480" height="480" aria-label="16×16 贪吃蛇场地"></canvas>
+
+    <div class="touch-pad" aria-label="手机触控方向键">
+      <button type="button" class="pad-btn pad-up" data-dir="up" aria-label="向上">▲</button>
+      <button type="button" class="pad-btn pad-left" data-dir="left" aria-label="向左">◀</button>
+      <button type="button" class="pad-btn pad-boost" data-boost aria-label="加速">加速</button>
+      <button type="button" class="pad-btn pad-right" data-dir="right" aria-label="向右">▶</button>
+      <button type="button" class="pad-btn pad-down" data-dir="down" aria-label="向下">▼</button>
+    </div>
+
+    <p id="status" class="status">按开始或 Enter 开始游戏</p>
+  </main>
+  <script src="../../auth.js"></script>
+  <script src="game.js"></script>
+  <script>
+    (function () {
+      var a = document.getElementById("back-showcase");
+      if (!a) return;
+      var path = location.pathname.replace(/\\/g, "/");
+      if (path.indexOf("/tools/snake") !== -1) {
+        a.href = "../../index.html";
+      } else {
+        a.href = "../小白学习助手/index.html";
+      }
+    })();
+  </script>
+</body>
+</html>
