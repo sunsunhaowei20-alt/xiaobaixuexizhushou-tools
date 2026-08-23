@@ -25,7 +25,12 @@ EOF
 echo "zhaiyue .env.local:"
 grep -E '^AI_' "$ZHAIYUE/.env.local" | sed 's/AI_API_KEY=.*/AI_API_KEY=***masked***/'
 
-pm2 restart zhaiyue
+pm2 delete zhaiyue 2>/dev/null || true
+PORT=${PORT_ZHAIYUE:-3000} HOSTNAME=127.0.0.1 NODE_ENV=production \
+  AI_API_KEY="$AI_API_KEY" \
+  AI_BASE_URL="${BASE}/v1" \
+  AI_MODEL="$AI_MODEL" \
+  pm2 start server.js --name zhaiyue --cwd "$ZHAIYUE" --update-env
 sleep 2
 pm2 list | grep zhaiyue || true
 
