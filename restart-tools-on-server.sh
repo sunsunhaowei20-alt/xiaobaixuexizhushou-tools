@@ -26,9 +26,11 @@ if [ ! -d node_modules/next ]; then
   echo "installing zhaiyue node_modules..."
   npm install --omit=dev --no-audit --no-fund
 fi
+ZHAIYUE_BASE="${AI_BASE_URL%/}"
+ZHAIYUE_BASE="${ZHAIYUE_BASE%/v1}"
 cat > .env.local << EOF
 AI_API_KEY=$AI_API_KEY
-AI_BASE_URL=$AI_BASE_URL
+AI_BASE_URL=${ZHAIYUE_BASE}/v1
 AI_MODEL=$AI_MODEL
 EOF
 pm2 delete zhaiyue 2>/dev/null || true
