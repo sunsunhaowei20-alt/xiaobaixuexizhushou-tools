@@ -81,6 +81,27 @@ else
   echo "cron watchdog already present"
 fi
 
+# 6) 超级大模型临时文件：超过 7 天自动删除（download/pdf/file）
+CLEANUP_SCRIPT="$BUNDLE/cleanup-superllm-tmp.sh"
+if [ -f "$SCRIPT_DIR/cleanup-superllm-tmp.sh" ]; then
+  cp -f "$SCRIPT_DIR/cleanup-superllm-tmp.sh" "$CLEANUP_SCRIPT"
+  chmod +x "$CLEANUP_SCRIPT"
+elif [ -f "$CLEANUP_SCRIPT" ]; then
+  chmod +x "$CLEANUP_SCRIPT"
+else
+  curl -fsSL "https://ghfast.top/https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/cleanup-superllm-tmp.sh" \
+    -o "$CLEANUP_SCRIPT" 2>/dev/null || true
+  chmod +x "$CLEANUP_SCRIPT" 2>/dev/null || true
+fi
+CLEANUP_MARK="# xiaobai-superllm-tmp-cleanup"
+CLEANUP_LINE="17 3 * * * $CLEANUP_SCRIPT >> /var/log/xiaobai-superllm-cleanup.log 2>&1 $CLEANUP_MARK"
+if [ -x "$CLEANUP_SCRIPT" ] && ! crontab -l 2>/dev/null | grep -q "$CLEANUP_MARK"; then
+  (crontab -l 2>/dev/null; echo "$CLEANUP_LINE") | crontab -
+  echo "cron superllm tmp cleanup installed (daily 03:17, 7 days retention)"
+elif crontab -l 2>/dev/null | grep -q "$CLEANUP_MARK"; then
+  echo "cron superllm tmp cleanup already present"
+fi
+
 pm2 list
 echo "[$(date)] ENABLE_TOOLS_ALWAYS_ON_DONE"
 echo "说明：服务器重启后 pm2 会自动拉起；若进程异常退出 pm2 也会重启；每5分钟额外巡检一次。"
