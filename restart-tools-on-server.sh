@@ -35,7 +35,10 @@ AI_MODEL=$AI_MODEL
 EOF
 pm2 delete zhaiyue 2>/dev/null || true
 PORT=${PORT_ZHAIYUE:-3000} HOSTNAME=127.0.0.1 NODE_ENV=production \
-  pm2 start server.js --name zhaiyue --cwd "$BUNDLE/services/zhaiyue"
+  AI_API_KEY="$AI_API_KEY" \
+  AI_BASE_URL="${ZHAIYUE_BASE}/v1" \
+  AI_MODEL="$AI_MODEL" \
+  pm2 start server.js --name zhaiyue --cwd "$BUNDLE/services/zhaiyue" --update-env --max-memory-restart 400M
 
 # xiaobai-api
 cat > "$BUNDLE/services/xiaobai-server/start.sh" << 'EOF'
@@ -54,7 +57,7 @@ pm2 start "$BUNDLE/services/xiaobai-server/start.sh" --name xiaobai-api --interp
 JAR="$BUNDLE/services/superllm/yu-ai-agent.jar"
 if [ -f "$JAR" ] && [ -x "$JDK21/bin/java" ]; then
   pm2 delete superllm 2>/dev/null || true
-  pm2 start "$JDK21/bin/java" --name superllm -- \
+  pm2 start "$JDK21/bin/java" --name superllm --max-memory-restart 800M -- \
     -jar "$JAR" \
     --server.port=${PORT_SUPERLLM:-8123} \
     --spring.ai.openai.api-key="$AI_API_KEY" \
