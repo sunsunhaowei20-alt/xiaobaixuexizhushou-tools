@@ -1,107 +1,78 @@
 #!/bin/bash
-# 一次性执行：让 01摘阅 / 03大模型 / 06小白安装 常驻（开机自启 + 崩溃重启 + 可选巡检）
-set -euo pipefail
-
+# 一次性：自愈 watchdog + 开机自启 + 每日预防性检查
+set -u
 export HOME=/root
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 BUNDLE=/opt/xiaobai-tools
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "[$(date)] ENABLE_TOOLS_ALWAYS_ON start"
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
-# 1) 先确保三个服务当前是起来的
-if [ -f "$SCRIPT_DIR/restart-tools-on-server.sh" ]; then
-  bash "$SCRIPT_DIR/restart-tools-on-server.sh"
-elif [ -f /tmp/restart-tools-on-server.sh ]; then
-  bash /tmp/restart-tools-on-server.sh
+log "ENABLE_TOOLS_ALWAYS_ON start"
+mkdir -p "$BUNDLE"
+
+# 1) 先完整修复一次（正确 pm2 启动 + jar 备份）
+if [ -f "$SCRIPT_DIR/fix-tools-3-6.sh" ]; then
+  bash "$SCRIPT_DIR/fix-tools-3-6.sh" || true
 else
-  curl -fsSL "https://ghfast.top/https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/restart-tools-on-server.sh" \
-    -o /tmp/restart-tools-on-server.sh
-  sed -i 's/\r$//' /tmp/restart-tools-on-server.sh
-  bash /tmp/restart-tools-on-server.sh
+  curl -fsSL "https://ghfast.top/https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/fix-tools-3-6.sh" \
+    -o /tmp/fix-tools-3-6.sh
+  bash /tmp/fix-tools-3-6.sh || true
 fi
 
-# 2) pm2 进程列表持久化（重启后恢复）
-pm2 save
-
-# 3) 注册 systemd 开机自启（只需成功一次）
-if command -v systemctl >/dev/null 2>&1; then
-  STARTUP_LINE=$(pm2 startup systemd -u root --hp /root 2>&1 | grep -E 'sudo env|env PATH' | tail -n 1 || true)
-  if [ -n "$STARTUP_LINE" ]; then
-    echo "running pm2 startup: $STARTUP_LINE"
-    eval "$STARTUP_LINE" || true
-  fi
-  systemctl enable pm2-root 2>/dev/null || true
-  systemctl is-enabled pm2-root 2>/dev/null || echo "WARN: pm2-root service not enabled yet"
+# 2) 安装自愈 watchdog（比单纯 restart 强）
+WATCHDOG="$BUNDLE/tools-watchdog.sh"
+if [ -f "$SCRIPT_DIR/tools-watchdog.sh" ]; then
+  cp -f "$SCRIPT_DIR/tools-watchdog.sh" "$WATCHDOG"
+else
+  curl -fsSL "https://ghfast.top/https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/tools-watchdog.sh" \
+    -o "$WATCHDOG"
 fi
-
-# 4) 安装轻量巡检脚本（502/进程挂了自动 pm2 restart）
-WATCHDOG="/opt/xiaobai-tools/tools-watchdog.sh"
-cat > "$WATCHDOG" << 'WATCHDOG_EOF'
-#!/bin/bash
-export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-export HOME=/root
-
-check() {
-  curl -sf -m 5 "$1" >/dev/null 2>&1
-}
-
-restarted=0
-
-if ! check "http://127.0.0.1:3000/"; then
-  pm2 restart zhaiyue 2>/dev/null || pm2 start /opt/xiaobai-tools/services/zhaiyue/server.js --name zhaiyue --cwd /opt/xiaobai-tools/services/zhaiyue 2>/dev/null || true
-  restarted=1
-fi
-
-if ! check "http://127.0.0.1:8123/api/swagger-ui.html"; then
-  pm2 restart superllm 2>/dev/null || true
-  restarted=1
-fi
-
-if ! check "http://127.0.0.1:8765/api/health"; then
-  pm2 restart xiaobai-api 2>/dev/null || true
-  restarted=1
-fi
-
-if [ "$restarted" = 1 ]; then
-  pm2 save 2>/dev/null || true
-  echo "[$(date)] tools-watchdog restarted one or more services"
-fi
-WATCHDOG_EOF
 chmod +x "$WATCHDOG"
 
-# 5) 写入 cron：每 5 分钟巡检一次（重复写入会跳过）
-CRON_MARK="# xiaobai-tools-watchdog"
-CRON_LINE="*/5 * * * * $WATCHDOG >> /var/log/xiaobai-tools-watchdog.log 2>&1 $CRON_MARK"
-if ! crontab -l 2>/dev/null | grep -q "$CRON_MARK"; then
-  (crontab -l 2>/dev/null; echo "$CRON_LINE") | crontab -
-  echo "cron watchdog installed (every 5 min)"
-else
-  echo "cron watchdog already present"
+# 3) pm2 持久化 + 开机自启
+pm2 save
+if command -v systemctl >/dev/null 2>&1; then
+  STARTUP_LINE=$(pm2 startup systemd -u root --hp /root 2>&1 | grep -E 'sudo env|env PATH' | tail -n 1 || true)
+  [ -n "$STARTUP_LINE" ] && eval "$STARTUP_LINE" || true
+  systemctl enable pm2-root 2>/dev/null || true
 fi
 
-# 6) 超级大模型临时文件：超过 7 天自动删除（download/pdf/file）
-CLEANUP_SCRIPT="$BUNDLE/cleanup-superllm-tmp.sh"
+# 4) cron：每 3 分钟自愈巡检
+CRON_MARK="# xiaobai-tools-watchdog"
+CRON_LINE="*/3 * * * * $WATCHDOG >> /var/log/xiaobai-tools-watchdog.log 2>&1 $CRON_MARK"
+(crontab -l 2>/dev/null | grep -v "$CRON_MARK"; echo "$CRON_LINE") | crontab -
+log "cron watchdog every 3 min (self-heal)"
+
+# 5) cron：每天 04:07 预防性全量修复
+HEAL_MARK="# xiaobai-tools-daily-heal"
+HEAL_SCRIPT="$BUNDLE/fix-tools-3-6.sh"
+if [ ! -f "$HEAL_SCRIPT" ] && [ -f "$SCRIPT_DIR/fix-tools-3-6.sh" ]; then
+  cp -f "$SCRIPT_DIR/fix-tools-3-6.sh" "$HEAL_SCRIPT"
+  chmod +x "$HEAL_SCRIPT"
+fi
+HEAL_LINE="7 4 * * * [ -x $HEAL_SCRIPT ] && $HEAL_SCRIPT >> /var/log/xiaobai-tools-daily-heal.log 2>&1 $HEAL_MARK"
+(crontab -l 2>/dev/null | grep -v "$HEAL_MARK"; echo "$HEAL_LINE") | crontab -
+log "cron daily heal 04:07"
+
+# 6) superllm 临时文件 7 天清理
+CLEANUP="$BUNDLE/cleanup-superllm-tmp.sh"
 if [ -f "$SCRIPT_DIR/cleanup-superllm-tmp.sh" ]; then
-  cp -f "$SCRIPT_DIR/cleanup-superllm-tmp.sh" "$CLEANUP_SCRIPT"
-  chmod +x "$CLEANUP_SCRIPT"
-elif [ -f "$CLEANUP_SCRIPT" ]; then
-  chmod +x "$CLEANUP_SCRIPT"
-else
-  curl -fsSL "https://ghfast.top/https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/cleanup-superllm-tmp.sh" \
-    -o "$CLEANUP_SCRIPT" 2>/dev/null || true
-  chmod +x "$CLEANUP_SCRIPT" 2>/dev/null || true
+  cp -f "$SCRIPT_DIR/cleanup-superllm-tmp.sh" "$CLEANUP"
+  chmod +x "$CLEANUP"
 fi
 CLEANUP_MARK="# xiaobai-superllm-tmp-cleanup"
-CLEANUP_LINE="17 3 * * * $CLEANUP_SCRIPT >> /var/log/xiaobai-superllm-cleanup.log 2>&1 $CLEANUP_MARK"
-if [ -x "$CLEANUP_SCRIPT" ] && ! crontab -l 2>/dev/null | grep -q "$CLEANUP_MARK"; then
-  (crontab -l 2>/dev/null; echo "$CLEANUP_LINE") | crontab -
-  echo "cron superllm tmp cleanup installed (daily 03:17, 7 days retention)"
-elif crontab -l 2>/dev/null | grep -q "$CLEANUP_MARK"; then
-  echo "cron superllm tmp cleanup already present"
+CLEANUP_LINE="17 3 * * * [ -x $CLEANUP ] && $CLEANUP >> /var/log/xiaobai-superllm-cleanup.log 2>&1 $CLEANUP_MARK"
+if [ -x "$CLEANUP" ]; then
+  (crontab -l 2>/dev/null | grep -v "$CLEANUP_MARK"; echo "$CLEANUP_LINE") | crontab -
 fi
 
+# 7) 备份 jar 防误删
+JAR="$BUNDLE/services/superllm/yu-ai-agent.jar"
+[ -f "$JAR" ] && cp -f "$JAR" "${JAR}.bak" 2>/dev/null || true
+
 pm2 list
-echo "[$(date)] ENABLE_TOOLS_ALWAYS_ON_DONE"
-echo "说明：服务器重启后 pm2 会自动拉起；若进程异常退出 pm2 也会重启；每5分钟额外巡检一次。"
+crontab -l | grep xiaobai || true
+log "ENABLE_TOOLS_ALWAYS_ON_DONE"
+log "说明：进程崩溃 pm2 自动拉起；每3分钟自愈(补jar/修启动)；每天4:07预防性检查；服务器重启后 pm2 恢复。"
