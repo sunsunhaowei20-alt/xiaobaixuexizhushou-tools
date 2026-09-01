@@ -59,7 +59,7 @@ if ! check "http://127.0.0.1:8123/api/swagger-ui.html"; then
   restarted=1
 fi
 
-if ! check "http://127.0.0.1:8765/health"; then
+if ! check "http://127.0.0.1:8765/api/health"; then
   pm2 restart xiaobai-api 2>/dev/null || true
   restarted=1
 fi
