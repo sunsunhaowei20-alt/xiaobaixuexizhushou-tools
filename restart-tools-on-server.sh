@@ -50,12 +50,13 @@ cd /opt/xiaobai-tools/services/xiaobai-server
 exec python3 -m uvicorn main:app --host 127.0.0.1 --port 8765
 EOF
 chmod +x "$BUNDLE/services/xiaobai-server/start.sh"
+sed -i 's/\r$//' "$BUNDLE/services/xiaobai-server/start.sh" || true
 XB_BASE="${AI_BASE_URL%/}"; XB_BASE="${XB_BASE%/v1}"
 printf "AI_API_KEY=%s\nAI_BASE_URL=%s/v1\nAI_MODEL=%s\nHOST=127.0.0.1\nPORT=%s\nSITE_ADMIN_PASS_HASH=d847ad955f2212645dd3053b773e6418ffe5822a0e93f6ab6f55e15de174d118\n" \
   "$AI_API_KEY" "$XB_BASE" "$AI_MODEL" "${PORT_XIAOBAI:-8765}" \
   > "$BUNDLE/services/xiaobai-server/.env"
 pm2 delete xiaobai-api 2>/dev/null || true
-pm2 start "$BUNDLE/services/xiaobai-server/start.sh" --name xiaobai-api --interpreter bash --max-memory-restart 400M
+pm2 start "$BUNDLE/services/xiaobai-server/start.sh" --name xiaobai-api --cwd "$BUNDLE/services/xiaobai-server" --max-memory-restart 400M
 ) || echo "WARN: xiaobai-api restart failed"
 
 # superllm
@@ -63,7 +64,7 @@ pm2 start "$BUNDLE/services/xiaobai-server/start.sh" --name xiaobai-api --interp
 JAR="$BUNDLE/services/superllm/yu-ai-agent.jar"
 if [ -f "$JAR" ] && [ -x "$JDK21/bin/java" ]; then
   pm2 delete superllm 2>/dev/null || true
-  pm2 start "$JDK21/bin/java" --name superllm --max-memory-restart 800M -- \
+  pm2 start "$JDK21/bin/java" --name superllm --cwd "$BUNDLE/services/superllm" --max-memory-restart 800M -- \
     -jar "$JAR" \
     --server.port=${PORT_SUPERLLM:-8123} \
     --spring.ai.openai.api-key="$AI_API_KEY" \

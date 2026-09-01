@@ -40,6 +40,7 @@ cd /opt/xiaobai-tools/services/xiaobai-server
 exec python3 -m uvicorn main:app --host 127.0.0.1 --port 8765
 EOF
   chmod +x "$XB/start.sh"
+  sed -i 's/\r$//' "$XB/start.sh" || true
   BASE="${AI_BASE_URL%/}"; BASE="${BASE%/v1}"
   cat > "$XB/.env" <<EOF
 AI_API_KEY=${AI_API_KEY}
@@ -50,7 +51,7 @@ PORT=${PORT_XIAOBAI:-8765}
 SITE_ADMIN_PASS_HASH=d847ad955f2212645dd3053b773e6418ffe5822a0e93f6ab6f55e15de174d118
 EOF
   pm2 delete xiaobai-api 2>/dev/null || true
-  pm2 start "$XB/start.sh" --name xiaobai-api --interpreter bash --max-memory-restart 400M
+  pm2 start "$XB/start.sh" --name xiaobai-api --cwd "$XB" --max-memory-restart 400M
   sleep 3
   local code
   code=$(curl -s -o /dev/null -w "%{http_code}" -m 10 http://127.0.0.1:8765/api/health || echo 000)
@@ -78,7 +79,7 @@ fix_superllm() {
   export JAVA_HOME="$JDK"
   export PATH="$JAVA_HOME/bin:$PATH"
   pm2 delete superllm 2>/dev/null || true
-  pm2 start "$JDK/bin/java" --name superllm --max-memory-restart 800M -- \
+  pm2 start "$JDK/bin/java" --name superllm --cwd "$BUNDLE/services/superllm" --max-memory-restart 800M -- \
     -jar "$JAR" \
     --server.port=${PORT_SUPERLLM:-8123} \
     --spring.ai.openai.api-key="$AI_API_KEY" \
