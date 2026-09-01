@@ -51,7 +51,7 @@ printf "AI_API_KEY=%s\nAI_BASE_URL=%s/v1\nAI_MODEL=%s\nHOST=127.0.0.1\nPORT=%s\n
   "$AI_API_KEY" "$AI_BASE_URL" "$AI_MODEL" "${PORT_XIAOBAI:-8765}" \
   > "$BUNDLE/services/xiaobai-server/.env"
 pm2 delete xiaobai-api 2>/dev/null || true
-pm2 start "$BUNDLE/services/xiaobai-server/start.sh" --name xiaobai-api --interpreter bash
+pm2 start "$BUNDLE/services/xiaobai-server/start.sh" --name xiaobai-api --interpreter bash --max-memory-restart 400M
 
 # superllm
 JAR="$BUNDLE/services/superllm/yu-ai-agent.jar"
