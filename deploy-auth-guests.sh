@@ -3,7 +3,7 @@
 set -euo pipefail
 SITE=/www/wwwroot/xiaobaixuexizhushou.cn
 XB=/opt/xiaobai-tools/services/xiaobai-server
-ZIP_URL="${1:-https://ghfast.top/https://github.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/releases/download/patch-auth-guests-sync-20260901b/patch-auth-guests-sync.zip}"
+ZIP_URL="${1:-https://ghfast.top/https://github.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/releases/download/patch-auth-guests-sync-20260901c/patch-auth-guests-sync.zip}"
 ROOT=/tmp/patch-auth-guests-sync
 
 echo "=== $(date) DEPLOY_AUTH_GUESTS ==="
