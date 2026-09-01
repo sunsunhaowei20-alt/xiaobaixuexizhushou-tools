@@ -6,7 +6,7 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 BUNDLE=/opt/xiaobai-tools
 ZHAIYUE="$BUNDLE/services/zhaiyue"
 RUN="$BUNDLE/services/runtime.env"
-ZIP_URL="${1:-https://ghfast.top/https://github.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/releases/download/zhaiyue-msn-yidian-20260901/zhaiyue-msn-yidian.zip}"
+ZIP_URL="${1:-https://ghfast.top/https://github.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/releases/download/zhaiyue-msn-yidian-20260901/zhaiyue-baike-fix.zip}"
 
 echo "=== $(date) DEPLOY_ZHAIYUE_MSN_YIDIAN ==="
 sed -i 's/\r$//' "$RUN" 2>/dev/null || true
