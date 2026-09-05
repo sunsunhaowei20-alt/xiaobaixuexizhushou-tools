@@ -22,14 +22,21 @@ echo $$ > "$LOCK"
 trap 'rm -f "$LOCK"' EXIT
 
 check_url() {
-  curl -sf -m 8 "$1" >/dev/null 2>&1
+  port_responding "$1"
 }
 
 pm2_errored() {
   local name="$1"
-  pm2 jlist 2>/dev/null | grep -q "\"name\":\"${name}\".*\"status\":\"errored\"" && return 0
-  pm2 jlist 2>/dev/null | grep -q "\"name\":\"${name}\".*\"status\":\"stopped\"" && return 0
-  return 1
+  local st
+  st=$(pm2 jlist 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(next((p.get('pm2_env',{}).get('status','') for p in d if p.get('name')=='$name'),'missing'))" 2>/dev/null || echo missing)
+  [ "$st" = "errored" ] || [ "$st" = "stopped" ] || [ "$st" = "missing" ]
+}
+
+port_responding() {
+  local url="$1"
+  local code
+  code=$(curl -s -o /dev/null -w "%{http_code}" -m 8 "$url" 2>/dev/null || echo 000)
+  [ "$code" != "000" ] && [ "$code" != "502" ] && [ "$code" != "503" ]
 }
 
 ensure_runtime() {

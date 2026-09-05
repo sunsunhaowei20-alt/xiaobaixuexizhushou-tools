@@ -63,7 +63,13 @@ fix_superllm() {
   echo "=== fix superllm ==="
   JAR="$BUNDLE/services/superllm/yu-ai-agent.jar"
   mkdir -p "$BUNDLE/services/superllm"
-  if [ ! -f "$JAR" ]; then
+  if [ ! -f "$JAR" ] || [ ! -s "$JAR" ]; then
+    if [ -f "${JAR}.bak" ] && [ -s "${JAR}.bak" ]; then
+      echo "superllm jar missing — restore from backup"
+      cp -f "${JAR}.bak" "$JAR"
+    fi
+  fi
+  if [ ! -f "$JAR" ] || [ ! -s "$JAR" ]; then
     for URL in \
       "https://ghfast.top/https://github.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/releases/download/superllm-jar-20260823/yu-ai-agent.jar" \
       "https://github.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/releases/download/superllm-jar-20260823/yu-ai-agent.jar"
