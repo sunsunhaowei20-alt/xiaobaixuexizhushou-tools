@@ -12,6 +12,25 @@ LOCK=/tmp/xiaobai-watchdog.lock
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
+# 每小时从 GitHub 同步最新脚本（服务器无需人工更新）
+sync_scripts() {
+  local stamp="/tmp/xiaobai-scripts-sync.ts"
+  if [ -f "$stamp" ] && [ "$(find "$stamp" -mmin -60 2>/dev/null)" ]; then
+    return 0
+  fi
+  local base="https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main"
+  for f in tools-watchdog.sh fix-tools-3-6.sh install-zero-touch-tools.sh heal-proxy.py; do
+    curl -fsSL "https://ghfast.top/${base}/${f}" -o "$BUNDLE/${f}.new" 2>/dev/null \
+      || curl -fsSL "${base}/${f}" -o "$BUNDLE/${f}.new" 2>/dev/null || continue
+    mv -f "$BUNDLE/${f}.new" "$BUNDLE/$f"
+    chmod +x "$BUNDLE/$f" 2>/dev/null || true
+  done
+  touch "$stamp"
+  log "scripts synced from GitHub"
+}
+
+sync_scripts
+
 if [ -f "$LOCK" ]; then
   pid=$(cat "$LOCK" 2>/dev/null || echo "")
   if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
