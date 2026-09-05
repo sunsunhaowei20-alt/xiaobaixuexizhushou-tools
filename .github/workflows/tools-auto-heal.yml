@@ -1,0 +1,40 @@
+name: Tools 3/6 Auto Heal
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check-and-heal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check production health
+        id: health
+        run: |
+          xiaobai=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 15 --max-time 20 \
+            "https://xiaobaixuexizhushou.cn/api/xiaobai/api/health" || echo 000)
+          superllm=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 15 --max-time 20 \
+            "https://xiaobaixuexizhushou.cn/api/superllm/api/swagger-ui.html" || echo 000)
+          echo "xiaobai=$xiaobai" >> "$GITHUB_OUTPUT"
+          echo "superllm=$superllm" >> "$GITHUB_OUTPUT"
+          echo "xiaobai=$xiaobai superllm=$superllm"
+
+      - name: Trigger remote heal if unhealthy
+        if: |
+          steps.health.outputs.xiaobai != '200' ||
+          (steps.health.outputs.superllm != '200' && steps.health.outputs.superllm != '301' && steps.health.outputs.superllm != '302')
+        run: |
+          echo "Unhealthy — triggering server heal endpoint"
+          curl -fsS --connect-timeout 20 --max-time 30 \
+            "https://xiaobaixuexizhushou.cn/internal/tools-heal" || true
+          sleep 45
+          xiaobai=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 15 --max-time 20 \
+            "https://xiaobaixuexizhushou.cn/api/xiaobai/api/health" || echo 000)
+          superllm=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 15 --max-time 20 \
+            "https://xiaobaixuexizhushou.cn/api/superllm/api/swagger-ui.html" || echo 000)
+          echo "After heal: xiaobai=$xiaobai superllm=$superllm"
+          if [ "$xiaobai" != "200" ] || { [ "$superllm" != "200" ] && [ "$superllm" != "301" ] && [ "$superllm" != "302" ]; }; then
+            echo "::warning::Tools still unhealthy after remote heal"
+            exit 0
+          fi

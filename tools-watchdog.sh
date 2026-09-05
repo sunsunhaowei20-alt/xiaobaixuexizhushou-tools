@@ -128,6 +128,15 @@ start_zhaiyue() {
 ensure_runtime || exit 0
 command -v pm2 >/dev/null 2>&1 || exit 0
 
+# 首次运行自动升级为「零手动」方案（无需人工执行 install 脚本）
+if [ ! -f "$BUNDLE/.zero-touch-installed" ]; then
+  log "bootstrap zero-touch installer"
+  if curl -fsSL "https://ghfast.top/https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/install-zero-touch-tools.sh" -o /tmp/install-zero-touch-tools.sh \
+    || curl -fsSL "https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/install-zero-touch-tools.sh" -o /tmp/install-zero-touch-tools.sh; then
+    bash /tmp/install-zero-touch-tools.sh >> /var/log/xiaobai-zero-touch-install.log 2>&1 || true
+  fi
+fi
+
 fixed=0
 
 if ! check_url "http://127.0.0.1:3000/" || pm2_errored "zhaiyue"; then

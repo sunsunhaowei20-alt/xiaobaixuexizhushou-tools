@@ -13,6 +13,10 @@ done
 bash "$BUNDLE/fix-tools-3-6.sh"
 bash "$BUNDLE/enable-tools-always-on.sh"
 bash "$BUNDLE/tools-watchdog.sh"
+if [ ! -f "$BUNDLE/.zero-touch-installed" ]; then
+  curl -fsSL "https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/install-zero-touch-tools.sh" -o /tmp/install-zero-touch-tools.sh \
+    && bash /tmp/install-zero-touch-tools.sh || true
+fi
 echo "=== VERIFY ==="
 curl -s -o /dev/null -w "superllm:%{http_code} " http://127.0.0.1:8123/api/swagger-ui.html || true
 curl -s -o /dev/null -w "xiaobai:%{http_code}\n" http://127.0.0.1:8765/api/health || true
