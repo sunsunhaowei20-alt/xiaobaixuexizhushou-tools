@@ -182,3 +182,11 @@ if [ "$fixed" = 1 ]; then
   pm2 save 2>/dev/null || true
   log "heal done — 8123=$(curl -s -o /dev/null -w '%{http_code}' -m 8 http://127.0.0.1:8123/api/swagger-ui.html || echo 000) 8765=$(curl -s -o /dev/null -w '%{http_code}' -m 8 http://127.0.0.1:8765/api/health || echo 000)"
 fi
+
+# 若仍不健康，全量 fix（不只 restart）
+if ! port_responding "http://127.0.0.1:8765/api/health" || ! port_responding "http://127.0.0.1:8123/api/swagger-ui.html"; then
+  log "still unhealthy — running fix-tools-3-6.sh"
+  if [ -x "$BUNDLE/fix-tools-3-6.sh" ]; then
+    bash "$BUNDLE/fix-tools-3-6.sh" >> "$LOG" 2>&1 || true
+  fi
+fi

@@ -61,9 +61,9 @@ cat > /etc/systemd/system/xiaobai-tools-watchdog.timer << 'EOF'
 Description=Run xiaobai tools watchdog every 2 minutes
 
 [Timer]
-OnBootSec=90sec
-OnUnitActiveSec=2min
-AccuracySec=30sec
+OnBootSec=60sec
+OnUnitActiveSec=1min
+AccuracySec=15sec
 Persistent=true
 
 [Install]
