@@ -113,7 +113,7 @@ CRON_D="/etc/cron.d/xiaobai-tools"
 cat > "$CRON_D" << EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-*/2 * * * * root ${BUNDLE}/tools-watchdog.sh >> /var/log/xiaobai-tools-watchdog.log 2>&1
+*/1 * * * * root ${BUNDLE}/tools-watchdog.sh >> /var/log/xiaobai-tools-watchdog.log 2>&1
 @reboot root sleep 120 && ${BUNDLE}/fix-tools-3-6.sh >> /var/log/xiaobai-tools-boot.log 2>&1
 EOF
 chmod 644 "$CRON_D"
