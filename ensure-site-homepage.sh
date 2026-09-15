@@ -5,8 +5,8 @@ export HOME=/root
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 SITE="${SITE:-/www/wwwroot/xiaobaixuexizhushou.cn}"
-BASE="https://github.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/releases/download/site-fix-20260916"
-PKG="site-fix-20260916.tar.gz"
+BASE="https://github.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/releases/download/site-fix-20260917"
+PKG="site-fix-20260917.tar.gz"
 LOG=/var/log/xiaobai-ensure-homepage.log
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
@@ -18,6 +18,7 @@ need_restore() {
   grep -q 'data-tool="saolei"' "$idx" 2>/dev/null || return 0
   grep -q 'data-tool="game2048"' "$idx" 2>/dev/null || return 0
   grep -q 'bay-id">08' "$idx" 2>/dev/null || return 0
+  grep -q 'data-tool="wannianli"' "$idx" 2>/dev/null || return 0
   return 1
 }
 
@@ -47,6 +48,8 @@ cp -f tools/2048/css/style.css "$SITE/tools/2048/css/"
 cp -f tools/2048/js/game.js "$SITE/tools/2048/js/"
 cp -f tools/jizhang/index.html "$SITE/tools/jizhang/"
 cp -f tools/jizhang/img/bg-ledger.jpg "$SITE/tools/jizhang/img/" 2>/dev/null || true
+mkdir -p "$SITE/tools/wannianli"
+cp -f tools/wannianli/index.html "$SITE/tools/wannianli/" 2>/dev/null || true
 
 chown www:www "$SITE/index.html" "$SITE/script.js" 2>/dev/null || true
 log "done saolei=$(grep -c saolei "$SITE/index.html" || echo 0) fix_btn=$(grep -c tools-fix-open "$SITE/index.html" || echo 0)"
