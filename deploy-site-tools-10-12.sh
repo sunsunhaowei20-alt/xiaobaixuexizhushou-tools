@@ -21,7 +21,7 @@ for d in saolei 2048 jizhang wannianli fangchengjisuan shudu wuziqi; do
   fi
 done
 chown -R www:www "$SITE/index.html" "$SITE/script.js" "$SITE/tools" 2>/dev/null || true
-echo "fangcheng=$(grep -c fangchengjisuan \"$SITE/index.html\" || echo 0)"
-echo "shudu=$(grep -c 'data-tool=\"shudu\"' \"$SITE/index.html\" || echo 0)"
-echo "wuziqi=$(grep -c wuziqi \"$SITE/index.html\" || echo 0)"
+echo "fangcheng=$(grep -c fangchengjisuan "$SITE/index.html" || echo 0)"
+echo "shudu=$(grep -c 'data-tool="shudu"' "$SITE/index.html" || echo 0)"
+echo "wuziqi=$(grep -c wuziqi "$SITE/index.html" || echo 0)"
 echo "DEPLOY_TOOLS_10_12_OK $(date)"
