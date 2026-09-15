@@ -1,5 +1,5 @@
 #!/bin/bash
-# 修复 03 超级大模型 + 06 小白安装（互不影响，单步失败继续）
+# 修复 01 摘阅 + 03 超级大模型 + 06 小白安装（互不影响，单步失败继续）
 set -u
 export HOME=/root
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -10,7 +10,7 @@ JDK=/opt/jdk-21
 LOG=/tmp/fix-tools-3-6.log
 exec > >(tee -a "$LOG") 2>&1
 
-echo "[$(date)] FIX_TOOLS_3_6 start"
+echo "[$(date)] FIX_TOOLS_1_3_6 start"
 
 if [ ! -f "$BUNDLE/services/runtime.env" ]; then
   echo "FATAL: missing $BUNDLE/services/runtime.env"
@@ -23,6 +23,34 @@ source "$BUNDLE/services/runtime.env"
 set +a
 
 command -v pm2 >/dev/null 2>&1 || npm install -g pm2
+
+# --- 01 摘阅 ---
+fix_zhaiyue() {
+  echo "=== fix zhaiyue ==="
+  local ZY="$BUNDLE/services/zhaiyue"
+  mkdir -p "$ZY"
+  if [ ! -f "$ZY/server.js" ]; then
+    echo "WARN: zhaiyue server.js missing at $ZY"
+    return 1
+  fi
+  if [ ! -d "$ZY/node_modules/next" ]; then
+    echo "installing zhaiyue node_modules..."
+    (cd "$ZY" && npm install --omit=dev --no-audit --no-fund) 2>/dev/null || true
+  fi
+  local base="${AI_BASE_URL%/}"; base="${base%/v1}"
+  cat > "$ZY/.env.local" <<EOF
+AI_API_KEY=${AI_API_KEY}
+AI_BASE_URL=${base}/v1
+AI_MODEL=${AI_MODEL:-DeepSeek-V4-Pro}
+EOF
+  pm2 delete zhaiyue 2>/dev/null || true
+  PORT=${PORT_ZHAIYUE:-3000} HOSTNAME=127.0.0.1 NODE_ENV=production \
+    pm2 start "$ZY/server.js" --name zhaiyue --cwd "$ZY" --max-memory-restart 400M
+  sleep 3
+  local code
+  code=$(curl -s -o /dev/null -w "%{http_code}" -m 10 http://127.0.0.1:3000/ || echo 000)
+  echo "zhaiyue local HTTP=$code"
+}
 
 # --- 06 小白安装 ---
 fix_xiaobai() {
@@ -101,6 +129,7 @@ fix_superllm() {
   fi
 }
 
+fix_zhaiyue || echo "WARN: zhaiyue fix had issues"
 fix_xiaobai || echo "WARN: xiaobai fix had issues"
 fix_superllm || echo "WARN: superllm fix had issues"
 
@@ -111,22 +140,8 @@ pm2 save
 JAR="$BUNDLE/services/superllm/yu-ai-agent.jar"
 [ -f "$JAR" ] && cp -f "$JAR" "${JAR}.bak" 2>/dev/null || true
 
-# 安装自愈 watchdog
-WATCHDOG="$BUNDLE/tools-watchdog.sh"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/tools-watchdog.sh" ]; then
-  cp -f "$SCRIPT_DIR/tools-watchdog.sh" "$WATCHDOG"
-elif [ -f "$WATCHDOG" ]; then
-  :
-else
-  curl -fsSL "https://ghfast.top/https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/tools-watchdog.sh" -o "$WATCHDOG" 2>/dev/null || true
-fi
-chmod +x "$WATCHDOG" 2>/dev/null || true
-CRON_MARK="# xiaobai-tools-watchdog"
-CRON_LINE="*/3 * * * * $WATCHDOG >> /var/log/xiaobai-tools-watchdog.log 2>&1 $CRON_MARK"
-(crontab -l 2>/dev/null | grep -v "$CRON_MARK"; echo "$CRON_LINE") | crontab - 2>/dev/null || true
-
 pm2 list
+curl -s -o /dev/null -w "3000:%{http_code} " http://127.0.0.1:3000/ || true
 curl -s -o /dev/null -w "8123:%{http_code} " http://127.0.0.1:8123/api/swagger-ui.html || true
 curl -s -o /dev/null -w "8765:%{http_code}\n" http://127.0.0.1:8765/api/health || true
-echo "[$(date)] FIX_TOOLS_3_6_DONE"
+echo "[$(date)] FIX_TOOLS_1_3_6_DONE"
