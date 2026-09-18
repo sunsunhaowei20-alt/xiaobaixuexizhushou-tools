@@ -1,10 +1,14 @@
 #!/bin/bash
-# 每 5 分钟巡检：健康检查 + 自愈（补 jar、修正 pm2 启动方式，不只 restart）
+# 自动巡检已默认关闭；需要时在服务器 export XIAOBAI_AUTO_HEAL=1 后再运行本脚本
 set -u
 export HOME=/root
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 BUNDLE=/opt/xiaobai-tools
+
+if [ -f "$BUNDLE/.manual-tools-only" ] || [ "${XIAOBAI_AUTO_HEAL:-0}" != "1" ]; then
+  exit 0
+fi
 JDK=/opt/jdk-21
 [ -x /opt/jdk21/bin/java ] && JDK=/opt/jdk21
 LOG=/var/log/xiaobai-tools-watchdog.log
@@ -19,7 +23,7 @@ sync_scripts() {
     return 0
   fi
   local base="https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main"
-  for f in tools-watchdog.sh fix-tools-3-6.sh install-zero-touch-tools.sh heal-proxy.py; do
+  for f in tools-watchdog.sh fix-tools-3-6.sh install-zero-touch-tools.sh heal-proxy.py ensure-site-homepage.sh; do
     curl -fsSL "https://ghfast.top/${base}/${f}" -o "$BUNDLE/${f}.new" 2>/dev/null \
       || curl -fsSL "${base}/${f}" -o "$BUNDLE/${f}.new" 2>/dev/null || continue
     mv -f "$BUNDLE/${f}.new" "$BUNDLE/$f"
@@ -140,8 +144,21 @@ start_superllm() {
 }
 
 start_zhaiyue() {
-  pm2 restart zhaiyue 2>/dev/null || pm2 start "$BUNDLE/services/zhaiyue/server.js" \
-    --name zhaiyue --cwd "$BUNDLE/services/zhaiyue" --max-memory-restart 400M 2>/dev/null || true
+  local ZY="$BUNDLE/services/zhaiyue"
+  mkdir -p "$ZY"
+  [ -f "$ZY/server.js" ] || return 1
+  if [ ! -d "$ZY/node_modules/next" ]; then
+    (cd "$ZY" && npm install --omit=dev --no-audit --no-fund) 2>/dev/null || true
+  fi
+  local base="${AI_BASE_URL%/}"; base="${base%/v1}"
+  cat > "$ZY/.env.local" <<EOF
+AI_API_KEY=${AI_API_KEY}
+AI_BASE_URL=${base}/v1
+AI_MODEL=${AI_MODEL:-DeepSeek-V4-Pro}
+EOF
+  pm2 delete zhaiyue 2>/dev/null || true
+  PORT=${PORT_ZHAIYUE:-3000} HOSTNAME=127.0.0.1 NODE_ENV=production \
+    pm2 start "$ZY/server.js" --name zhaiyue --cwd "$ZY" --max-memory-restart 400M --restart-delay 3000
 }
 
 ensure_runtime || exit 0
@@ -180,13 +197,20 @@ fi
 
 if [ "$fixed" = 1 ]; then
   pm2 save 2>/dev/null || true
-  log "heal done — 8123=$(curl -s -o /dev/null -w '%{http_code}' -m 8 http://127.0.0.1:8123/api/swagger-ui.html || echo 000) 8765=$(curl -s -o /dev/null -w '%{http_code}' -m 8 http://127.0.0.1:8765/api/health || echo 000)"
+  log "heal done — 3000=$(curl -s -o /dev/null -w '%{http_code}' -m 8 http://127.0.0.1:3000/ || echo 000) 8123=$(curl -s -o /dev/null -w '%{http_code}' -m 8 http://127.0.0.1:8123/api/swagger-ui.html || echo 000) 8765=$(curl -s -o /dev/null -w '%{http_code}' -m 8 http://127.0.0.1:8765/api/health || echo 000)"
 fi
 
 # 若仍不健康，全量 fix（不只 restart）
-if ! port_responding "http://127.0.0.1:8765/api/health" || ! port_responding "http://127.0.0.1:8123/api/swagger-ui.html"; then
+if ! port_responding "http://127.0.0.1:3000/" \
+  || ! port_responding "http://127.0.0.1:8765/api/health" \
+  || ! port_responding "http://127.0.0.1:8123/api/swagger-ui.html"; then
   log "still unhealthy — running fix-tools-3-6.sh"
   if [ -x "$BUNDLE/fix-tools-3-6.sh" ]; then
     bash "$BUNDLE/fix-tools-3-6.sh" >> "$LOG" 2>&1 || true
   fi
 fi
+
+if [ -x "$BUNDLE/ensure-site-homepage.sh" ]; then
+  bash "$BUNDLE/ensure-site-homepage.sh" >> "$LOG" 2>&1 || true
+fi
+
