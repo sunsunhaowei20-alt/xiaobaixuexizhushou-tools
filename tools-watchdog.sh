@@ -27,6 +27,7 @@ sync_scripts() {
     curl -fsSL "https://ghfast.top/${base}/${f}" -o "$BUNDLE/${f}.new" 2>/dev/null \
       || curl -fsSL "${base}/${f}" -o "$BUNDLE/${f}.new" 2>/dev/null || continue
     mv -f "$BUNDLE/${f}.new" "$BUNDLE/$f"
+    sed -i 's/\r$//g' "$BUNDLE/$f" 2>/dev/null || true
     chmod +x "$BUNDLE/$f" 2>/dev/null || true
   done
   touch "$stamp"
