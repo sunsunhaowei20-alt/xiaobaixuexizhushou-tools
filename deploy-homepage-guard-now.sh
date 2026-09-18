@@ -19,6 +19,9 @@ tar -xzf p.tar.gz
 cp -f index.html script.js auth.js config.js styles.css site-footer.js "$SITE/"
 cp -f ensure-site-homepage.sh "$BUNDLE/" 2>/dev/null || true
 chmod +x "$BUNDLE/ensure-site-homepage.sh" 2>/dev/null || true
+for f in "$BUNDLE"/*.sh; do
+  [ -f "$f" ] && sed -i 's/\r$//g' "$f"
+done
 
 grep -c 'data-tool="choujiang"' "$SITE/index.html"
 grep -c 'tool-chip is-slot' "$SITE/index.html" || echo "is_slot=0"
