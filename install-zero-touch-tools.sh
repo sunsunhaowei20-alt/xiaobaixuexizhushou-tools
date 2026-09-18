@@ -1,8 +1,10 @@
 #!/bin/bash
-# 零手动运维：systemd 定时自愈 + 开机修复 + heal 外网触发 + pm2 持久化
-# 用法（服务器只需执行一次）：
-#   curl -fsSL https://raw.githubusercontent.com/sunsunhaowei20-alt/xiaobaixuexizhushou-tools/main/install-zero-touch-tools.sh | bash
+# 已弃用：默认改用手动「修复 / 代码复制」。仅当明确需要自动巡检时：XIAOBAI_AUTO_HEAL=1 bash install-zero-touch-tools.sh
 set -u
+if [ "${XIAOBAI_AUTO_HEAL:-0}" != "1" ]; then
+  echo "install-zero-touch-tools.sh 已停用。请执行 disable-tools-auto-heal.sh，并用首页按钮手动修复。"
+  exit 0
+fi
 export HOME=/root
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -23,7 +25,7 @@ fetch() {
   chmod +x "$BUNDLE/$f" 2>/dev/null || true
 }
 
-for f in fix-tools-3-6.sh tools-watchdog.sh enable-tools-always-on.sh heal-tools-3-6-now.sh; do
+for f in fix-tools-3-6.sh tools-watchdog.sh enable-tools-always-on.sh heal-tools-3-6-now.sh ensure-site-homepage.sh; do
   fetch "$f"
 done
 fetch_py() {
@@ -114,6 +116,7 @@ cat > "$CRON_D" << EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */1 * * * * root ${BUNDLE}/tools-watchdog.sh >> /var/log/xiaobai-tools-watchdog.log 2>&1
+17 * * * * root ${BUNDLE}/ensure-site-homepage.sh >> /var/log/xiaobai-ensure-homepage.log 2>&1
 @reboot root sleep 120 && ${BUNDLE}/fix-tools-3-6.sh >> /var/log/xiaobai-tools-boot.log 2>&1
 EOF
 chmod 644 "$CRON_D"
@@ -137,6 +140,7 @@ block = '''
     location = /internal/tools-heal {
         proxy_pass http://127.0.0.1:8766/heal?token=xb-heal-d847ad955f2212645dd3053b773e6418;
         proxy_http_version 1.1;
+        proxy_set_header X-Admin-Hash $http_x_admin_hash;
         allow all;
     }
 '''
