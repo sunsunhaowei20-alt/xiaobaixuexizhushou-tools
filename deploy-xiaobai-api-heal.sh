@@ -17,6 +17,7 @@ curl -fL --connect-timeout 30 -m 120 -o p.tar.gz "$BASE/$PKG" \
   || curl -fL --connect-timeout 30 -m 120 -o p.tar.gz "https://ghfast.top/$BASE/$PKG"
 tar -xzf p.tar.gz
 mkdir -p "$XB"
+rm -rf "$XB/app"
 shopt -s dotglob nullglob
 for item in main.py requirements.txt app static admin; do
   if [ -e "$item" ]; then
@@ -24,6 +25,10 @@ for item in main.py requirements.txt app static admin; do
   fi
 done
 shopt -u dotglob nullglob
+test -f "$XB/app/routers/site_auth.py" || {
+  echo "FATAL: site_auth.py missing after sync"
+  exit 1
+}
 
 if [ -f "$BUNDLE/services/runtime.env" ]; then
   set -a
