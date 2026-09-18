@@ -144,4 +144,7 @@ pm2 list
 curl -s -o /dev/null -w "3000:%{http_code} " http://127.0.0.1:3000/ || true
 curl -s -o /dev/null -w "8123:%{http_code} " http://127.0.0.1:8123/api/swagger-ui.html || true
 curl -s -o /dev/null -w "8765:%{http_code}\n" http://127.0.0.1:8765/api/health || true
+if [ -x "$BUNDLE/ensure-site-homepage.sh" ]; then
+  bash "$BUNDLE/ensure-site-homepage.sh" || true
+fi
 echo "[$(date)] FIX_TOOLS_1_3_6_DONE"
